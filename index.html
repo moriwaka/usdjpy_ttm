@@ -146,10 +146,30 @@
         // Parse date from various formats
         function parseDate(dateStr) {
             if (!dateStr) return null;
-            const cleaned = dateStr.trim().replace(/\//g, '-').replace(/\./g, '-');
-            const d = new Date(cleaned);
-            if (isNaN(d.getTime())) return null;
-            return d.toISOString().split('T')[0];
+            const cleaned = dateStr.trim();
+            const parts = cleaned.split(/[./-]/).map(part => part.trim()).filter(Boolean);
+            if (parts.length !== 3) return null;
+
+            let [yearPart, monthPart, dayPart] = parts;
+            if (!/^\d+$/.test(yearPart + monthPart + dayPart)) return null;
+
+            let year = Number(yearPart);
+            const month = Number(monthPart);
+            const day = Number(dayPart);
+
+            if (yearPart.length === 2) {
+                year = 2000 + year;
+            }
+
+            if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+            const date = new Date(Date.UTC(year, month - 1, day));
+            if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+                return null;
+            }
+
+            return date.toISOString().split('T')[0];
         }
 
         // Fetch rates for all unique dates
@@ -184,61 +204,70 @@
             showLoading();
             resultsSection.classList.add('hidden');
             resultsBody.innerHTML = '';
-            
-            const lines = rawText.split('\n');
-            const rows = [];
-            const uniqueDates = new Set();
 
-            lines.forEach(line => {
-                // Split by tab OR multiple spaces
-                const parts = line.split(/\t|\s{2,}/);
-                const dateRaw = parts[0]?.trim();
-                const amountRaw = parts[1]?.trim();
-                // 3列目以降はすべて「メモ」として結合する
-                const userMemo = parts.slice(2).join(' ').trim();
-                
-                const dateFormatted = parseDate(dateRaw);
-                const amount = parseFloat(amountRaw?.replace(/,/g, ''));
+            try {
+                const lines = rawText.split('\n');
+                const rows = [];
+                const uniqueDates = new Set();
 
-                if (dateFormatted && !isNaN(amount)) {
-                    rows.push({ date: dateFormatted, rawDate: dateRaw, amount, userMemo });
-                    uniqueDates.add(dateFormatted);
+                lines.forEach(line => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return;
+
+                    const parts = trimmedLine.includes('\t')
+                        ? trimmedLine.split('\t')
+                        : trimmedLine.split(/\s+/);
+                    const dateRaw = parts[0]?.trim();
+                    const amountRaw = parts[1]?.trim();
+                    // 3列目以降はすべて「メモ」として結合する
+                    const userMemo = parts.slice(2).join(' ').trim();
+
+                    const dateFormatted = parseDate(dateRaw);
+                    const amount = parseFloat(amountRaw?.replace(/,/g, ''));
+
+                    if (dateFormatted && !isNaN(amount)) {
+                        rows.push({ date: dateFormatted, rawDate: dateRaw, amount, userMemo });
+                        uniqueDates.add(dateFormatted);
+                    }
+                });
+
+                if (rows.length === 0) {
+                    showError('有効なデータが見つかりませんでした。日付と金額が正しく入力されているか確認してください。');
+                    return;
                 }
-            });
 
-            if (rows.length === 0) {
+                const rateMap = await fetchRates(Array.from(uniqueDates));
+                const spreadValue = parseFloat(spreadEl.value) || 0;
+                const roundingMode = roundingEl.value;
+
+                results = rows.map(row => {
+                    const rateData = rateMap.get(row.date);
+                    let finalRate = null;
+                    let jpyAmount = null;
+                    let systemNote = '';
+
+                    if (rateData && rateData.rate) {
+                        finalRate = rateData.rate + spreadValue;
+                        const rawJpy = row.amount * finalRate;
+
+                        if (roundingMode === 'round') jpyAmount = Math.round(rawJpy);
+                        else if (roundingMode === 'floor') jpyAmount = Math.floor(rawJpy);
+                        else if (roundingMode === 'ceil') jpyAmount = Math.ceil(rawJpy);
+                    } else {
+                        systemNote = rateData?.error || '不明なエラー';
+                    }
+
+                    return { ...row, finalRate, jpyAmount, systemNote };
+                });
+
+                renderResults();
+                resultsSection.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                showError('処理中にエラーが発生しました。時間をおいて再度お試しください。');
+            } finally {
                 hideLoading();
-                showError('有効なデータが見つかりませんでした。日付と金額が正しく入力されているか確認してください。');
-                return;
             }
-
-            const rateMap = await fetchRates(Array.from(uniqueDates));
-            const spreadValue = parseFloat(spreadEl.value) || 0;
-            const roundingMode = roundingEl.value;
-
-            results = rows.map(row => {
-                const rateData = rateMap.get(row.date);
-                let finalRate = null;
-                let jpyAmount = null;
-                let systemNote = '';
-
-                if (rateData && rateData.rate) {
-                    finalRate = rateData.rate + spreadValue;
-                    const rawJpy = row.amount * finalRate;
-                    
-                    if (roundingMode === 'round') jpyAmount = Math.round(rawJpy);
-                    else if (roundingMode === 'floor') jpyAmount = Math.floor(rawJpy);
-                    else if (roundingMode === 'ceil') jpyAmount = Math.ceil(rawJpy);
-                } else {
-                    systemNote = rateData?.error || '不明なエラー';
-                }
-
-                return { ...row, finalRate, jpyAmount, systemNote };
-            });
-
-            renderResults();
-            hideLoading();
-            resultsSection.classList.remove('hidden');
         });
 
         function renderResults() {
