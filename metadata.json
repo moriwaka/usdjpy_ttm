@@ -1,0 +1,5 @@
+{
+  "name": "USD-JPY TTM Converter",
+  "description": "年月日とUSD金額のリストを、特定日の為替レート(TTM相当)で円換算し、スプレッドシートに貼り付け可能な形式で出力するツールです。",
+  "requestFramePermissions": []
+}
