@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# USD-JPY TTM Converter
 
-# Run and deploy your AI Studio app
+スプレッドシート（Google SheetsやExcel）から日付と金額のリストをコピー＆ペーストし、特定日の為替レート（TTM相当）に基づいて一括で日本円に換算するツールです。
 
-This contains everything you need to run your app locally.
+## 主な機能
 
-View your app in AI Studio: https://ai.studio/apps/drive/1TmdGcylhGr0peE2iSEVbrLDbvdSI9TvO
+- **一括換算**: 日付とUSD金額のリストを一度に処理。
+- **スプレッド補正**: 公示レートに対して独自のスプレッド（為替手数料など）を加減算可能。
+- **端数処理**: 四捨五入、切り捨て、切り上げを選択可能。
+- **自由記入欄の保持**: 入力データの3列目以降にあるメモを出力の備考欄に自動で引き継ぎます。
+- **スプレッドシート対応**: 計算結果をワンクリックでコピーし、そのままスプレッドシートに貼り付け可能。
+- **履歴保存**: 入力したデータはブラウザの `localStorage` に保存され、ページを閉じても保持されます。
 
-## Run Locally
+## 使い方
 
-**Prerequisites:**  Node.js
+1. スプレッドシートから「日付」と「金額」の列を選択してコピーします。
+2. 「入力データ」欄に貼り付けます（タブ区切り推奨）。
+3. 必要に応じて「スプレッド補正」や「端数処理」を設定します。
+4. 「換算を実行する」ボタンを押します。
+5. 結果を確認し、「結果をコピー」ボタンでスプレッドシートへ書き戻します。
 
+## 技術スタック
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **UI**: Tailwind CSS / Lucide Icons
+- **API**: [Frankfurter API](https://www.frankfurter.app/) (欧州中央銀行のデータを参照)
+- **Architecture**: 1ファイル完結型（HTML/CSS/JS）
+
+## 動作環境
+
+- モダンブラウザ（Chrome, Edge, Firefox, Safariなど）
+- インターネット接続（為替レート取得のため）
+
+---
+*Note: このツールは1つのHTMLファイルで完結するように設計されています。サーバーへのデータ送信は行われず、プライバシーに配慮した設計です。*
